@@ -10,6 +10,9 @@ import com.badlogic.gdx.graphics.VertexAttributes.Usage;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
+import com.badlogic.gdx.physics.box2d.Fixture;
+import com.badlogic.gdx.physics.box2d.QueryCallback;
+import com.badlogic.gdx.utils.Array;
 
 /**
  * Abstract base class for all positional lights
@@ -20,6 +23,7 @@ import com.badlogic.gdx.physics.box2d.Body;
  */
 public abstract class PositionalLight extends Light {
 
+	protected final Vector2 tmpStart = new Vector2();
 	protected final Vector2 tmpEnd = new Vector2();
 	protected final Vector2 start = new Vector2();
 	
@@ -33,6 +37,12 @@ public abstract class PositionalLight extends Light {
 
 	protected float endX[];
 	protected float endY[];
+	
+	protected float[] dynamicSegments;
+	final Vector2 tmpVec = new Vector2();
+	final Array<Fixture> affectedFixtures = new Array<Fixture>();
+	
+	protected float height = 0f;
 	
 	/** 
 	 * Creates new positional light and automatically adds it to the specified
@@ -76,6 +86,7 @@ public abstract class PositionalLight extends Light {
 		if (staticLight && !dirty) return;
 		
 		dirty = false;
+		
 		updateMesh();
 	}
 	
@@ -87,7 +98,7 @@ public abstract class PositionalLight extends Light {
 		lightMesh.render(
 			rayHandler.lightShader, GL20.GL_TRIANGLE_FAN, 0, vertexNum);
 		
-		if (soft && !xray) {
+		if (soft && !xray && !rayHandler.pseudo3d) {
 			softShadowMesh.render(
 				rayHandler.lightShader,
 				GL20.GL_TRIANGLE_STRIP,
@@ -208,6 +219,10 @@ public abstract class PositionalLight extends Light {
 		cos = new float[rays];
 		endX = new float[rays];
 		endY = new float[rays];
+		
+		if (rayHandler.pseudo3d) {
+			dynamicSegments = new float[vertexNum * 16];
+		}
 	}
 	
 	protected boolean cull() {
@@ -238,11 +253,25 @@ public abstract class PositionalLight extends Light {
 			mx[i] = tmpEnd.x;
 			tmpEnd.y = endY[i] + start.y;
 			my[i] = tmpEnd.y;
-			if (rayHandler.world != null && !xray) {
+			if (rayHandler.world != null && !xray && !rayHandler.pseudo3d) {
 				rayHandler.world.rayCast(ray, start, tmpEnd);
 			}
 		}
 		setMesh();
+	}
+	
+	protected void prepeareFixtureData() {
+		affectedFixtures.clear();
+		rayHandler.world.QueryAABB(
+				dynamicShadowCallback,
+				start.x - distance, start.y - distance,
+				start.x + distance, start.y + distance);
+		for (Fixture fixture : affectedFixtures) {
+			if (fixture.getUserData() instanceof LightData) {
+				LightData data = (LightData)fixture.getUserData();
+				data.shadowsDropped++;
+			}
+		}
 	}
 
 	protected void setMesh() {
@@ -262,7 +291,7 @@ public abstract class PositionalLight extends Light {
 		}
 		lightMesh.setVertices(segments, 0, size);
 
-		if (!soft || xray) return;
+		if (!soft || xray || rayHandler.pseudo3d) return;
 
 		size = 0;
 		// rays ending points.
@@ -279,5 +308,17 @@ public abstract class PositionalLight extends Light {
 		}
 		softShadowMesh.setVertices(segments, 0, size);
 	}
+	
+	final QueryCallback dynamicShadowCallback = new QueryCallback() {
+
+		@Override
+		public boolean reportFixture(Fixture fixture) {
+			if (fixture.getBody() != body) {
+				affectedFixtures.add(fixture);
+			}
+			return true;
+		}
+		
+	};
 	
 }

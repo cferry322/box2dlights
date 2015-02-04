@@ -1,7 +1,15 @@
 package box2dLight;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Mesh;
+import com.badlogic.gdx.graphics.Mesh.VertexDataType;
+import com.badlogic.gdx.graphics.VertexAttribute;
+import com.badlogic.gdx.graphics.VertexAttributes.Usage;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.physics.box2d.Fixture;
+import com.badlogic.gdx.physics.box2d.PolygonShape;
+import com.badlogic.gdx.physics.box2d.Shape;
 
 /**
  * Light shaped as a circle with given radius
@@ -58,6 +66,74 @@ public class PointLight extends PositionalLight {
 		
 		dirty = false;
 		updateMesh();
+		
+		if (rayHandler.pseudo3d && height != 0f) {
+			prepeareFixtureData();
+		}
+	}
+	
+	@Override
+	void dynamicShadowRender () {
+		if (height == 0f) return;
+		
+		updateDynamicShadowMeshes();
+		for (Mesh m : dynamicShadowMeshes) {
+			m.render(rayHandler.lightShader, GL20.GL_TRIANGLE_STRIP);
+		}
+	}
+	
+	
+	protected void updateDynamicShadowMeshes() {
+		for (Mesh mesh : dynamicShadowMeshes) {
+			mesh.dispose();
+		}
+		dynamicShadowMeshes.clear();
+		
+		if (dynamicSegments == null) {
+			dynamicSegments = new float[vertexNum * 16];
+		}
+		
+		float colBits = rayHandler.ambientLight.toFloatBits();
+		for (Fixture fixture : affectedFixtures) {
+			LightData data = (LightData)fixture.getUserData();
+			Shape fixtureShape = fixture.getShape();
+			if (fixtureShape instanceof PolygonShape) {
+				Mesh mesh = new Mesh(
+						VertexDataType.VertexArray, staticLight, 2 * vertexNum, 0,
+						new VertexAttribute(Usage.Position, 2, "vertex_positions"),
+						new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
+						new VertexAttribute(Usage.Generic, 1, "s"));
+				PolygonShape shape = (PolygonShape)fixtureShape;
+				int size = 0;
+				float l;
+				float dst = fixture.getBody().getWorldCenter().dst(start);
+				float f = 1f / data.shadowsDropped;
+				for (int n = 0; n < shape.getVertexCount(); n++) {
+					shape.getVertex(n, tmpVec);
+					tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+					
+					dynamicSegments[size++] = tmpVec.x;
+					dynamicSegments[size++] = tmpVec.y;
+					dynamicSegments[size++] = colBits;
+					dynamicSegments[size++] = f;
+					
+					if (height > data.height) {
+						l = dst * data.height / (height - data.height);
+						if (l > distance - dst) l = distance - dst;
+					} else {
+						l = distance - dst;
+					}
+					
+					tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
+					dynamicSegments[size++] = tmpEnd.x;
+					dynamicSegments[size++] = tmpEnd.y;
+					dynamicSegments[size++] = colBits;
+					dynamicSegments[size++] = f;
+				}
+				mesh.setVertices(dynamicSegments, 0, size);
+				dynamicShadowMeshes.add(mesh);
+			}
+		}
 	}
 	
 	/**
@@ -71,6 +147,10 @@ public class PointLight extends PositionalLight {
 		dist *= RayHandler.gammaCorrectionParameter;
 		this.distance = dist < 0.01f ? 0.01f : dist;
 		dirty = true;
+	}
+	
+	public void setHeight(float height) {
+		this.height = height;
 	}
 	
 	/** Updates light basing on it's distance and rayNum **/

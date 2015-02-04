@@ -7,6 +7,7 @@ import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.Filter;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.RayCastCallback;
+import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
 
 /**
@@ -47,6 +48,7 @@ public abstract class Light implements Disposable {
 	
 	protected Mesh lightMesh;
 	protected Mesh softShadowMesh;
+	protected Array<Mesh> dynamicShadowMeshes = new Array<Mesh>();
 
 	protected float segments[];
 	protected float[] mx;
@@ -89,6 +91,13 @@ public abstract class Light implements Disposable {
 	 * Render this light
 	 */
 	abstract void render();
+	
+	/**
+	 * Render this light shadow
+	 */
+	void dynamicShadowRender() {
+		
+	}
 	
 	/**
 	 * Sets light distance
@@ -223,6 +232,10 @@ public abstract class Light implements Disposable {
 	public void dispose() {
 		lightMesh.dispose();
 		softShadowMesh.dispose();
+		for (Mesh mesh : dynamicShadowMeshes) {
+			mesh.dispose();
+		}
+		dynamicShadowMeshes.clear();
 	}
 
 	/**
@@ -443,6 +456,14 @@ public abstract class Light implements Disposable {
 		filterA.categoryBits = categoryBits;
 		filterA.groupIndex = groupIndex;
 		filterA.maskBits = maskBits;
+	}
+	
+	/** Returns the distance between the given line and point. Note the specified line is not a line segment. */
+	public static float sqDistanceLinePoint (float startX, float startY, float endX, float endY, float pointX, float pointY) {
+		float tmp1 = (endX - startX);
+		float tmp2 = (endY - startY);
+		float normalLength2 = tmp1 * tmp1 + tmp2 * tmp2;
+		return ((pointX - startX) * tmp2 - (pointY - startY) * tmp1) / normalLength2;
 	}
 
 }

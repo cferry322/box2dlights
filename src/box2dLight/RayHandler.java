@@ -11,6 +11,8 @@ import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.physics.box2d.Body;
+import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
@@ -72,6 +74,8 @@ public class RayHandler implements Disposable {
 	 * <p>NOTE: DO NOT MODIFY THIS LIST
 	 */
 	final Array<Light> disabledLights = new Array<Light>(false, 16);
+	
+	final Array<Body> bodies = new Array<Body>();
 
 	final LightMap lightMap;
 	final ShaderProgram lightShader;
@@ -80,6 +84,9 @@ public class RayHandler implements Disposable {
 	boolean shadows = true;
 	boolean blur = true;
 	
+	/** Experimental mode **/
+	boolean pseudo3d = false;
+
 	int blurNum = 1;
 	
 	boolean customViewport = false;
@@ -271,6 +278,16 @@ public class RayHandler implements Disposable {
 	 * @see #render()
 	 */
 	public void update() {
+		world.getBodies(bodies);
+		for (Body body : bodies) {
+			for (Fixture fixture : body.getFixtureList()) {
+				if (fixture.getUserData() instanceof LightData) {
+					LightData data = (LightData)fixture.getUserData();
+					data.shadowsDropped = 0;
+				}
+			}
+		}
+		
 		for (Light light : lightList) {
 			light.update();
 		}
@@ -297,7 +314,6 @@ public class RayHandler implements Disposable {
 
 		Gdx.gl.glDepthMask(false);
 		Gdx.gl.glEnable(GL20.GL_BLEND);
-		simpleBlendFunc.apply();
 
 		boolean useLightMap = (shadows || blur); 
 		if (useLightMap) {
@@ -309,8 +325,17 @@ public class RayHandler implements Disposable {
 		lightShader.begin();
 		{
 			lightShader.setUniformMatrix("u_projTrans", combined);
+			
+			simpleBlendFunc.apply();
 			for (Light light : lightList) {
 				light.render();
+			}
+			
+			if (pseudo3d) {
+				shadowBlendFunc.apply();
+				for (Light light : lightList) {
+					light.dynamicShadowRender();
+				}
 			}
 		}
 		lightShader.end();
@@ -534,6 +559,15 @@ public class RayHandler implements Disposable {
 	 */
 	public void useDefaultViewport() {
 		customViewport = false;
+	}
+	
+	/** 
+	 * /!\ Experimental mode with dynamic shadowing in pseudo-3d world
+	 * 
+	 * @param flag
+	 */
+	public void setPseudo3dLight(boolean flag) {
+		pseudo3d = flag;
 	}
 
 	/**
