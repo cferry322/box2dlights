@@ -332,7 +332,7 @@ public class RayHandler implements Disposable {
 			}
 			
 			if (pseudo3d) {
-				shadowBlendFunc.apply();
+				diffuseBlendFunc.apply();
 				for (Light light : lightList) {
 					light.dynamicShadowRender();
 				}
