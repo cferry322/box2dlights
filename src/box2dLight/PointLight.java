@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.VertexAttributes.Usage;
 import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.physics.box2d.CircleShape;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.Shape;
@@ -103,11 +104,11 @@ public class PointLight extends PositionalLight {
 		for (Fixture fixture : affectedFixtures) {
 			LightData data = (LightData)fixture.getUserData();
 			Shape fixtureShape = fixture.getShape();
+			center.set(fixture.getBody().getWorldCenter());
 			if (fixtureShape instanceof PolygonShape) {
 				PolygonShape shape = (PolygonShape)fixtureShape;
 				int size = 0;
 				float l;
-				center.set(fixture.getBody().getWorldCenter());
 				float f = 1f / data.shadowsDropped;
 				int minN = -1;
 				int maxN = -1;
@@ -162,7 +163,6 @@ public class PointLight extends PositionalLight {
 				
 				for (int k = 0; k < ind.size; k++) {
 					int n = ind.get(k);
-					
 					tmpVec.set(tmpVerts.get(n));
 					
 					float dst = tmpVec.dst(start);
@@ -196,6 +196,57 @@ public class PointLight extends PositionalLight {
 							new VertexAttribute(Usage.Position, 2, "vertex_positions"),
 							new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
 							new VertexAttribute(Usage.Generic, 1, "s"));
+				mesh.setVertices(dynamicSegments, 0, size);
+				dynamicShadowMeshes.add(mesh);
+			} else if (fixtureShape instanceof CircleShape) {
+				CircleShape shape = (CircleShape)fixtureShape;
+				int size = 0;
+				float r = shape.getRadius();
+				float dst = tmpVec.set(center).dst(start);
+				float a = (float)Math.acos(r/dst) * MathUtils.radDeg;
+				float l;
+				if (height > data.height) {
+					l = dst * data.height / (height - data.height);
+					float diff = distance - dst;
+					if (l > diff) l = diff;
+				} else if (height == 0f) {
+					l = distance;
+				} else {
+					l = distance - dst;
+				}
+				if (l < 0) l = 0f;
+				
+				tmpVec.set(start).sub(center).clamp(r, r).rotate(a);
+				tmpStart.set(center).add(tmpVec);
+				dynamicSegments[size++] = tmpStart.x;
+				dynamicSegments[size++] = tmpStart.y;
+				dynamicSegments[size++] = colBits;
+				dynamicSegments[size++] = 1f;
+				
+				tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
+				dynamicSegments[size++] = tmpEnd.x;
+				dynamicSegments[size++] = tmpEnd.y;
+				dynamicSegments[size++] = colBits;
+				dynamicSegments[size++] = 1f;
+				
+				tmpVec.rotate(-2f*a);
+				tmpStart.set(center).add(tmpVec);
+				dynamicSegments[size++] = tmpStart.x;
+				dynamicSegments[size++] = tmpStart.y;
+				dynamicSegments[size++] = colBits;
+				dynamicSegments[size++] = 1f;
+				
+				tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
+				dynamicSegments[size++] = tmpEnd.x;
+				dynamicSegments[size++] = tmpEnd.y;
+				dynamicSegments[size++] = colBits;
+				dynamicSegments[size++] = 1f;
+				
+				Mesh mesh = new Mesh(
+						VertexDataType.VertexArray, staticLight, size / 4, 0,
+						new VertexAttribute(Usage.Position, 2, "vertex_positions"),
+						new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
+						new VertexAttribute(Usage.Generic, 1, "s"));
 				mesh.setVertices(dynamicSegments, 0, size);
 				dynamicShadowMeshes.add(mesh);
 			}
