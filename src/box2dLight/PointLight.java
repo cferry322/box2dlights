@@ -12,6 +12,7 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.Shape;
+import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.IntArray;
 
 /**
@@ -70,15 +71,13 @@ public class PointLight extends PositionalLight {
 		dirty = false;
 		updateMesh();
 		
-		if (rayHandler.pseudo3d && height != 0f) {
+		if (rayHandler.pseudo3d) {
 			prepeareFixtureData();
 		}
 	}
 	
 	@Override
 	void dynamicShadowRender () {
-		if (height == 0f) return;
-		
 		updateDynamicShadowMeshes();
 		for (Mesh m : dynamicShadowMeshes) {
 			m.render(rayHandler.lightShader, GL20.GL_TRIANGLE_STRIP);
@@ -87,6 +86,8 @@ public class PointLight extends PositionalLight {
 	
 	final Vector2 center = new Vector2(); 
 	final IntArray ind = new IntArray();
+	final LightData tmpData = new LightData(0f);
+	final Array<Vector2> tmpVerts = new Array<Vector2>();
 	
 	protected void updateDynamicShadowMeshes() {
 		for (Mesh mesh : dynamicShadowMeshes) {
@@ -103,11 +104,6 @@ public class PointLight extends PositionalLight {
 			LightData data = (LightData)fixture.getUserData();
 			Shape fixtureShape = fixture.getShape();
 			if (fixtureShape instanceof PolygonShape) {
-				Mesh mesh = new Mesh(
-						VertexDataType.VertexArray, staticLight, 2 * vertexNum, 0,
-						new VertexAttribute(Usage.Position, 2, "vertex_positions"),
-						new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
-						new VertexAttribute(Usage.Generic, 1, "s"));
 				PolygonShape shape = (PolygonShape)fixtureShape;
 				int size = 0;
 				float l;
@@ -118,9 +114,11 @@ public class PointLight extends PositionalLight {
 				int minDstN = -1;
 				float minDst = Float.POSITIVE_INFINITY;
 				boolean hasGasp = false;
+				tmpVerts.clear();
 				for (int n = 0; n < shape.getVertexCount(); n++) {
 					shape.getVertex(n, tmpVec);
 					tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+					tmpVerts.add(tmpVec.cpy());
 					tmpEnd.set(tmpVec).sub(start).limit(0.01f).add(tmpVec);
 					if (fixture.testPoint(tmpEnd)) {
 						if (n > minN) minN = n;
@@ -164,20 +162,22 @@ public class PointLight extends PositionalLight {
 				
 				for (int k = 0; k < ind.size; k++) {
 					int n = ind.get(k);
-					shape.getVertex(n, tmpVec);
-					tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+					
+					tmpVec.set(tmpVerts.get(n));
 					
 					float dst = tmpVec.dst(start);
 					if (height > data.height) {
 						l = dst * data.height / (height - data.height);
-						if (l > distance - dst) l = distance - dst;
+						float diff = distance - dst;
+						if (l > diff) l = diff;
+					} else if (height == 0f) {
+						l = distance;
 					} else {
 						l = distance - dst;
 					}
 					if (l < 0) l = 0f;
 					
 					tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
-					
 					
 					dynamicSegments[size++] = tmpVec.x;
 					dynamicSegments[size++] = tmpVec.y;
@@ -189,6 +189,13 @@ public class PointLight extends PositionalLight {
 					dynamicSegments[size++] = colBits;
 					dynamicSegments[size++] = f;
 				}
+				
+				
+				Mesh mesh = new Mesh(
+							VertexDataType.VertexArray, staticLight, 2 * ind.size, 0,
+							new VertexAttribute(Usage.Position, 2, "vertex_positions"),
+							new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
+							new VertexAttribute(Usage.Generic, 1, "s"));
 				mesh.setVertices(dynamicSegments, 0, size);
 				dynamicShadowMeshes.add(mesh);
 			}
