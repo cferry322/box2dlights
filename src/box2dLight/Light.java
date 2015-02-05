@@ -457,13 +457,5 @@ public abstract class Light implements Disposable {
 		filterA.groupIndex = groupIndex;
 		filterA.maskBits = maskBits;
 	}
-	
-	/** Returns the distance between the given line and point. Note the specified line is not a line segment. */
-	public static float sqDistanceLinePoint (float startX, float startY, float endX, float endY, float pointX, float pointY) {
-		float tmp1 = (endX - startX);
-		float tmp2 = (endY - startY);
-		float normalLength2 = tmp1 * tmp1 + tmp2 * tmp2;
-		return ((pointX - startX) * tmp2 - (pointY - startY) * tmp1) / normalLength2;
-	}
 
 }
