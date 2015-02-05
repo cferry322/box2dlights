@@ -103,13 +103,15 @@ public class PointLight extends PositionalLight {
 		float colBits = rayHandler.ambientLight.toFloatBits();
 		for (Fixture fixture : affectedFixtures) {
 			LightData data = (LightData)fixture.getUserData();
+			if (data == null) continue;
+			
 			Shape fixtureShape = fixture.getShape();
 			center.set(fixture.getBody().getWorldCenter());
+			float l = 0f;
+			float f = 1f / data.shadowsDropped;
 			if (fixtureShape instanceof PolygonShape) {
 				PolygonShape shape = (PolygonShape)fixtureShape;
 				int size = 0;
-				float l;
-				float f = 1f / data.shadowsDropped;
 				int minN = -1;
 				int maxN = -1;
 				int minDstN = -1;
@@ -204,7 +206,6 @@ public class PointLight extends PositionalLight {
 				float r = shape.getRadius();
 				float dst = tmpVec.set(center).dst(start);
 				float a = (float)Math.acos(r/dst) * MathUtils.radDeg;
-				float l;
 				if (height > data.height) {
 					l = dst * data.height / (height - data.height);
 					float diff = distance - dst;
@@ -221,26 +222,26 @@ public class PointLight extends PositionalLight {
 				dynamicSegments[size++] = tmpStart.x;
 				dynamicSegments[size++] = tmpStart.y;
 				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = 1f;
+				dynamicSegments[size++] = f;
 				
 				tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
 				dynamicSegments[size++] = tmpEnd.x;
 				dynamicSegments[size++] = tmpEnd.y;
 				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = 1f;
+				dynamicSegments[size++] = f;
 				
 				tmpVec.rotate(-2f*a);
 				tmpStart.set(center).add(tmpVec);
 				dynamicSegments[size++] = tmpStart.x;
 				dynamicSegments[size++] = tmpStart.y;
 				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = 1f;
+				dynamicSegments[size++] = f;
 				
 				tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
 				dynamicSegments[size++] = tmpEnd.x;
 				dynamicSegments[size++] = tmpEnd.y;
 				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = 1f;
+				dynamicSegments[size++] = f;
 				
 				Mesh mesh = new Mesh(
 						VertexDataType.VertexArray, staticLight, size / 4, 0,
