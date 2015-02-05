@@ -6,10 +6,13 @@ import com.badlogic.gdx.graphics.Mesh;
 import com.badlogic.gdx.graphics.Mesh.VertexDataType;
 import com.badlogic.gdx.graphics.VertexAttribute;
 import com.badlogic.gdx.graphics.VertexAttributes.Usage;
+import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.Shape;
+import com.badlogic.gdx.utils.IntArray;
 
 /**
  * Light shaped as a circle with given radius
@@ -82,6 +85,8 @@ public class PointLight extends PositionalLight {
 		}
 	}
 	
+	final Vector2 center = new Vector2(); 
+	final IntArray ind = new IntArray();
 	
 	protected void updateDynamicShadowMeshes() {
 		for (Mesh mesh : dynamicShadowMeshes) {
@@ -106,25 +111,79 @@ public class PointLight extends PositionalLight {
 				PolygonShape shape = (PolygonShape)fixtureShape;
 				int size = 0;
 				float l;
-				float dst = fixture.getBody().getWorldCenter().dst(start);
+				center.set(fixture.getBody().getWorldCenter());
 				float f = 1f / data.shadowsDropped;
+				int minN = -1;
+				int maxN = -1;
+				int minDstN = -1;
+				float minDst = Float.POSITIVE_INFINITY;
+				boolean hasGasp = false;
 				for (int n = 0; n < shape.getVertexCount(); n++) {
 					shape.getVertex(n, tmpVec);
 					tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+					tmpEnd.set(tmpVec).sub(start).limit(0.01f).add(tmpVec);
+					if (fixture.testPoint(tmpEnd)) {
+						if (n > minN) minN = n;
+						maxN = n;
+						hasGasp = true;
+						continue;
+					}
+					float currDist = tmpVec.dst2(start);
+					if (currDist < minDst) {
+						minDst = currDist;
+						minDstN = n;
+					}
+				}
+				
+				ind.clear();
+				if (!hasGasp) {
+					shape.getVertex(minDstN, tmpVec);
+					tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+					boolean correctDirection = Intersector.pointLineSide(
+							start, center, tmpVec) < 0;
+					for (int n = minDstN; n < shape.getVertexCount(); n++) {
+						ind.add(n);
+					}
+					for (int n = 0; n < minDstN; n++) {
+						ind.add(n);
+					}
+					if (!correctDirection) {
+						int z = ind.get(0);
+						ind.removeIndex(0);
+						ind.reverse();
+						ind.insert(0, z);
+					}
+				} else {
+					for (int n = minN - 1; n > -1; n--) {
+						ind.add(n);
+					}
+					for (int n = shape.getVertexCount() - 1; n > maxN ; n--) {
+						ind.add(n);
+					}
+				}
+				
+				for (int k = 0; k < ind.size; k++) {
+					int n = ind.get(k);
+					shape.getVertex(n, tmpVec);
+					tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
 					
-					dynamicSegments[size++] = tmpVec.x;
-					dynamicSegments[size++] = tmpVec.y;
-					dynamicSegments[size++] = colBits;
-					dynamicSegments[size++] = f;
-					
+					float dst = tmpVec.dst(start);
 					if (height > data.height) {
 						l = dst * data.height / (height - data.height);
 						if (l > distance - dst) l = distance - dst;
 					} else {
 						l = distance - dst;
 					}
+					if (l < 0) l = 0f;
 					
 					tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
+					
+					
+					dynamicSegments[size++] = tmpVec.x;
+					dynamicSegments[size++] = tmpVec.y;
+					dynamicSegments[size++] = colBits;
+					dynamicSegments[size++] = f;
+					
 					dynamicSegments[size++] = tmpEnd.x;
 					dynamicSegments[size++] = tmpEnd.y;
 					dynamicSegments[size++] = colBits;
