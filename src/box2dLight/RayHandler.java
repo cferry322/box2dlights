@@ -31,6 +31,11 @@ public class RayHandler implements Disposable {
 
 	static boolean gammaCorrection = false;
 	static float gammaCorrectionParameter = 1f;
+	
+	/** TODO: This could be made adaptive to ratio of camera sizes * zoom
+	 * vs the CircleShape radius - thus will provide smooth radial shadows
+	 * while resizing and zooming in and out */
+	static int CIRCLE_APPROX_POINTS = 32;
 
 	/** if this is public why we have a setter?
 	 * TODO: remove public modifier and add getter 

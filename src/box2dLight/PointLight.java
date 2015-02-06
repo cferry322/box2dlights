@@ -200,34 +200,29 @@ public class PointLight extends PositionalLight {
 				CircleShape shape = (CircleShape)fixtureShape;
 				float r = shape.getRadius();
 				float dst = tmpVec.set(center).dst(start);
-				float a = (float)Math.acos(r/dst) * MathUtils.radDeg;
+				float a = (float) Math.acos(r/dst);
 				l = data.getLimit(dst, height, distance);
 				
-				tmpVec.set(start).sub(center).clamp(r, r).rotate(a);
+				tmpVec.set(start).sub(center).clamp(r, r).rotateRad(a);
 				tmpStart.set(center).add(tmpVec);
-				dynamicSegments[size++] = tmpStart.x;
-				dynamicSegments[size++] = tmpStart.y;
-				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = f;
 				
-				tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
-				dynamicSegments[size++] = tmpEnd.x;
-				dynamicSegments[size++] = tmpEnd.y;
-				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = f;
-				
-				tmpVec.rotate(-2f*a);
-				tmpStart.set(center).add(tmpVec);
-				dynamicSegments[size++] = tmpStart.x;
-				dynamicSegments[size++] = tmpStart.y;
-				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = f;
-				
-				tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
-				dynamicSegments[size++] = tmpEnd.x;
-				dynamicSegments[size++] = tmpEnd.y;
-				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = f;
+				float angle = (MathUtils.PI2 - 2f * a) /
+						RayHandler.CIRCLE_APPROX_POINTS;
+				for (int k = 0; k < RayHandler.CIRCLE_APPROX_POINTS; k++) {
+					tmpStart.set(center).add(tmpVec);
+					dynamicSegments[size++] = tmpStart.x;
+					dynamicSegments[size++] = tmpStart.y;
+					dynamicSegments[size++] = colBits;
+					dynamicSegments[size++] = f;
+					
+					tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
+					dynamicSegments[size++] = tmpEnd.x;
+					dynamicSegments[size++] = tmpEnd.y;
+					dynamicSegments[size++] = colBits;
+					dynamicSegments[size++] = f;
+					
+					tmpVec.rotateRad(angle);
+				}
 			} else if (type == Type.Edge) {
 				EdgeShape shape = (EdgeShape)fixtureShape;
 				
