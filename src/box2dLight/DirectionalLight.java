@@ -422,15 +422,14 @@ public class DirectionalLight extends Light {
 	 * <p> This could be used to simulate sun cycles **/
 	@Override
 	public void setHeight(float degrees) {
-		if (degrees < 0f) degrees = 0f;
+		if (degrees < 0f) height = 0f;
 		else {
 			degrees = degrees % 360;
 			if (degrees > 180f) {
-				degrees = -1f;
+				height = -1f;
 			}
-			else if (degrees != 90f) degrees = Math.abs(degrees - 90f);
+			else if (degrees != 90f) height = Math.abs(degrees - 90f);
 		}
-		height = degrees;
 	}
 
 	/** Not applicable for this light type **/

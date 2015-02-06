@@ -2,12 +2,19 @@ package box2dLight;
 
 public class LightData {
 	
+	public Object userData = null;
+	
 	float height;
 	
 	int shadowsDropped = 0;
 	
 	public LightData(float h) {
 		height = h;
+	}
+	
+	public LightData(Object data, float h) {
+		height = h;
+		userData = data;
 	}
 	
 	public float getLimit(float distance, float lightHeight, float lightRange) {
