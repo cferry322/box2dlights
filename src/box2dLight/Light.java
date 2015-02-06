@@ -9,6 +9,7 @@ import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.RayCastCallback;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.IntArray;
 
 /**
  * Light is data container for all the light parameters. When created lights
@@ -48,7 +49,6 @@ public abstract class Light implements Disposable {
 	
 	protected Mesh lightMesh;
 	protected Mesh softShadowMesh;
-	protected Array<Mesh> dynamicShadowMeshes = new Array<Mesh>();
 
 	protected float segments[];
 	protected float[] mx;
@@ -56,6 +56,22 @@ public abstract class Light implements Disposable {
 	protected float[] f;
 	protected int m_index = 0;
 
+	/** Dynamic shadows variables **/
+	protected static final LightData tmpData = new LightData(0f);
+	
+	protected float height = 0f;
+	
+	protected final Array<Mesh> dynamicShadowMeshes = new Array<Mesh>();
+	protected final Array<Fixture> affectedFixtures = new Array<Fixture>();
+	protected final Array<Vector2> tmpVerts = new Array<Vector2>();
+	
+	protected final IntArray ind = new IntArray();
+	
+	protected final Vector2 tmpStart = new Vector2();
+	protected final Vector2 tmpEnd = new Vector2();
+	protected final Vector2 tmpVec = new Vector2();
+	protected final Vector2 center = new Vector2(); 
+	
 	/** 
 	 * Creates new active light and automatically adds it to the specified
 	 * {@link RayHandler} instance.
@@ -383,6 +399,10 @@ public abstract class Light implements Disposable {
 	 */
 	public boolean getIgnoreAttachedBody() {
 		return ignoreBody;
+	}
+	
+	public void setHeight(float height) {
+		this.height = height;
 	}
 	
 	/**

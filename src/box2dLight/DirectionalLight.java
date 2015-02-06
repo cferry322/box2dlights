@@ -7,9 +7,18 @@ import com.badlogic.gdx.graphics.Mesh;
 import com.badlogic.gdx.graphics.Mesh.VertexDataType;
 import com.badlogic.gdx.graphics.VertexAttribute;
 import com.badlogic.gdx.graphics.VertexAttributes.Usage;
+import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
+import com.badlogic.gdx.physics.box2d.ChainShape;
+import com.badlogic.gdx.physics.box2d.CircleShape;
+import com.badlogic.gdx.physics.box2d.EdgeShape;
+import com.badlogic.gdx.physics.box2d.Fixture;
+import com.badlogic.gdx.physics.box2d.PolygonShape;
+import com.badlogic.gdx.physics.box2d.QueryCallback;
+import com.badlogic.gdx.physics.box2d.Shape;
+import com.badlogic.gdx.physics.box2d.Shape.Type;
 
 /**
  * Light which source is at infinite distance
@@ -24,6 +33,11 @@ public class DirectionalLight extends Light {
 	protected final Vector2 end[];
 	protected float sin;
 	protected float cos;
+	
+	/** Dynamic shadows variables **/
+	protected final Vector2 lstart = new Vector2();
+	protected float xDisp;
+	protected float yDisp;
 
 	/**
 	 * Creates directional light which source is at infinite distance,
@@ -78,6 +92,16 @@ public class DirectionalLight extends Light {
 	
 	@Override
 	void update () {
+		if (rayHandler.pseudo3d && height != -1f) {
+			float width = (rayHandler.x2 - rayHandler.x1);
+			float height = (rayHandler.y2 - rayHandler.y1);
+			float sizeOfScreen = width > height ? width : height;
+			xDisp = -sizeOfScreen * cos;
+			yDisp = -sizeOfScreen * sin;
+			
+			prepeareFixtureData();
+		}
+		
 		if (staticLight && !dirty) return;
 		dirty = false;
 
@@ -114,7 +138,7 @@ public class DirectionalLight extends Light {
 			mx[i] = end[i].x = steppedX + xAxelOffSet;
 			my[i] = end[i].y = steppedY + yAxelOffSet;
 
-			if (rayHandler.world != null && !xray) {
+			if (rayHandler.world != null && !xray && !rayHandler.pseudo3d) {
 				rayHandler.world.rayCast(ray, start[i], end[i]);
 			}
 		}
@@ -136,7 +160,7 @@ public class DirectionalLight extends Light {
 		}
 		lightMesh.setVertices(segments, 0, size);
 
-		if (!soft || xray) return;
+		if (!soft || xray || rayHandler.pseudo3d) return;
 
 		size = 0;
 		for (int i = 0; i < arraySize; i++) {
@@ -156,12 +180,203 @@ public class DirectionalLight extends Light {
 	@Override
 	void render () {
 		rayHandler.lightRenderedLastFrame++;
+
 		lightMesh.render(
 				rayHandler.lightShader, GL20.GL_TRIANGLE_STRIP, 0, vertexNum);
 		
-		if (soft && !xray) {
+		if (soft && !xray && !rayHandler.pseudo3d) {
 			softShadowMesh.render(
 				rayHandler.lightShader, GL20.GL_TRIANGLE_STRIP, 0, vertexNum);
+		}
+	}
+	
+	@Override
+	void dynamicShadowRender () {
+		if (height == -1f) return;
+		
+		updateDynamicShadowMeshes();
+		for (Mesh m : dynamicShadowMeshes) {
+			m.render(rayHandler.lightShader, GL20.GL_TRIANGLE_STRIP);
+		}
+	}
+	
+	protected void prepeareFixtureData() {
+		affectedFixtures.clear();
+		rayHandler.world.QueryAABB(
+				dynamicShadowCallback,
+				rayHandler.x1, rayHandler.y1,
+				rayHandler.x2, rayHandler.y2);
+		for (Fixture fixture : affectedFixtures) {
+			if (fixture.getUserData() instanceof LightData) {
+				LightData data = (LightData)fixture.getUserData();
+				data.shadowsDropped++;
+			}
+		}
+	}
+	
+	protected void updateDynamicShadowMeshes() {
+		for (Mesh mesh : dynamicShadowMeshes) {
+			mesh.dispose();
+		}
+		dynamicShadowMeshes.clear();
+		
+		float colBits = rayHandler.ambientLight.toFloatBits();
+		for (Fixture fixture : affectedFixtures) {
+			LightData data = (LightData)fixture.getUserData();
+			if (data == null || fixture.isSensor()) continue;
+			
+			Shape fixtureShape = fixture.getShape();
+			Type type = fixtureShape.getType();
+			center.set(fixture.getBody().getWorldCenter());
+			lstart.set(center).add(xDisp, yDisp);
+			
+			int size = 0;
+			float l = data.height /
+					(float)Math.tan(height * MathUtils.degRad);
+			float f = 1f / data.shadowsDropped;
+			if (type == Type.Polygon || type == Type.Chain) {
+				boolean isPolygon = (type == Type.Polygon);
+				ChainShape cShape = isPolygon ?
+						null : (ChainShape)fixtureShape;
+				PolygonShape pShape = isPolygon ?
+						(PolygonShape)fixtureShape : null;
+				int vertexCount = isPolygon ?
+						pShape.getVertexCount() :
+							cShape.getVertexCount();
+				int minN = -1;
+				int maxN = -1;
+				int minDstN = -1;
+				float minDst = Float.POSITIVE_INFINITY;
+				boolean hasGasp = false;
+				tmpVerts.clear();
+				for (int n = 0; n < vertexCount; n++) {
+					if (isPolygon) {
+						pShape.getVertex(n, tmpVec);
+					} else {
+						cShape.getVertex(n, tmpVec);
+					}
+					tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+					tmpVerts.add(tmpVec.cpy());
+					tmpEnd.set(tmpVec).sub(lstart).limit(0.01f).add(tmpVec);
+					if (fixture.testPoint(tmpEnd)) {
+						if (n > minN) minN = n;
+						maxN = n;
+						hasGasp = true;
+						continue;
+					}
+					float currDist = tmpVec.dst2(lstart);
+					if (currDist < minDst) {
+						minDst = currDist;
+						minDstN = n;
+					}
+				}
+				
+				ind.clear();
+				if (!hasGasp) {
+					tmpVec.set(tmpVerts.get(minDstN));
+					boolean correctDirection = Intersector.pointLineSide(
+							lstart, center, tmpVec) < 0;
+					for (int n = minDstN; n < vertexCount; n++) {
+						ind.add(n);
+					}
+					for (int n = 0; n < minDstN; n++) {
+						ind.add(n);
+					}
+					if (!correctDirection) {
+						int z = ind.get(0);
+						ind.removeIndex(0);
+						ind.reverse();
+						ind.insert(0, z);
+					}
+				} else {
+					for (int n = minN - 1; n > -1; n--) {
+						ind.add(n);
+					}
+					for (int n = vertexCount - 1; n > maxN ; n--) {
+						ind.add(n);
+					}
+				}
+				
+				for (int k = 0; k < ind.size; k++) {
+					int n = ind.get(k);
+					tmpVec.set(tmpVerts.get(n));
+					tmpEnd.set(tmpVec).sub(lstart).limit(l).add(tmpVec);
+					
+					segments[size++] = tmpVec.x;
+					segments[size++] = tmpVec.y;
+					segments[size++] = colBits;
+					segments[size++] = f;
+					
+					segments[size++] = tmpEnd.x;
+					segments[size++] = tmpEnd.y;
+					segments[size++] = colBits;
+					segments[size++] = f;
+				}
+			} else if (type == Type.Circle) {
+				CircleShape shape = (CircleShape)fixtureShape;
+				
+				float r = shape.getRadius();
+				float dst = tmpVec.set(center).dst(lstart);
+				float a = (float) Math.acos(r/dst);
+				
+				tmpVec.set(lstart).sub(center).clamp(r, r).rotateRad(a);
+				tmpStart.set(center).add(tmpVec);
+				
+				float angle = (MathUtils.PI2 - 2f * a) /
+						RayHandler.CIRCLE_APPROX_POINTS;
+				for (int k = 0; k < RayHandler.CIRCLE_APPROX_POINTS; k++) {
+					tmpStart.set(center).add(tmpVec);
+					segments[size++] = tmpStart.x;
+					segments[size++] = tmpStart.y;
+					segments[size++] = colBits;
+					segments[size++] = f;
+					
+					tmpEnd.set(tmpStart).sub(lstart).limit(l).add(tmpStart);
+					segments[size++] = tmpEnd.x;
+					segments[size++] = tmpEnd.y;
+					segments[size++] = colBits;
+					segments[size++] = f;
+					
+					tmpVec.rotateRad(angle);
+				}
+			} else if (type == Type.Edge) {
+				EdgeShape shape = (EdgeShape)fixtureShape;
+				
+				shape.getVertex1(tmpVec);
+				tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+				
+				segments[size++] = tmpVec.x;
+				segments[size++] = tmpVec.y;
+				segments[size++] = colBits;
+				segments[size++] = f;
+				
+				tmpEnd.set(tmpVec).sub(lstart).limit(l).add(tmpVec);
+				segments[size++] = tmpEnd.x;
+				segments[size++] = tmpEnd.y;
+				segments[size++] = colBits;
+				segments[size++] = f;
+				
+				shape.getVertex2(tmpVec);
+				tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+				segments[size++] = tmpVec.x;
+				segments[size++] = tmpVec.y;
+				segments[size++] = colBits;
+				segments[size++] = 1f;
+				
+				tmpEnd.set(tmpVec).sub(lstart).limit(l).add(tmpVec);
+				segments[size++] = tmpEnd.x;
+				segments[size++] = tmpEnd.y;
+				segments[size++] = colBits;
+				segments[size++] = f;
+			}		
+			
+			Mesh mesh = new Mesh(
+					VertexDataType.VertexArray, staticLight, size / 4, 0,
+					new VertexAttribute(Usage.Position, 2, "vertex_positions"),
+					new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
+					new VertexAttribute(Usage.Generic, 1, "s"));
+			mesh.setVertices(segments, 0, size);
+			dynamicShadowMeshes.add(mesh);
 		}
 	}
 	
@@ -186,6 +401,36 @@ public class DirectionalLight extends Light {
 			}
 		}
 		return oddNodes;
+	}
+	
+	final QueryCallback dynamicShadowCallback = new QueryCallback() {
+
+		@Override
+		public boolean reportFixture(Fixture fixture) {
+			if (fixture.getUserData() instanceof LightData) {
+				LightData data = (LightData)fixture.getUserData();
+				data.shadowsDropped = 0;
+			}
+			affectedFixtures.add(fixture);
+			return true;
+		}
+		
+	};
+	
+	/** Sets the horizontal angle for directional light in degrees
+	 * 
+	 * <p> This could be used to simulate sun cycles **/
+	@Override
+	public void setHeight(float degrees) {
+		if (degrees < 0f) degrees = 0f;
+		else {
+			degrees = degrees % 360;
+			if (degrees > 180f) {
+				degrees = -1f;
+			}
+			else if (degrees != 90f) degrees = Math.abs(degrees - 90f);
+		}
+		height = degrees;
 	}
 
 	/** Not applicable for this light type **/

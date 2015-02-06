@@ -8,7 +8,6 @@ import com.badlogic.gdx.graphics.VertexAttribute;
 import com.badlogic.gdx.graphics.VertexAttributes.Usage;
 import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.ChainShape;
 import com.badlogic.gdx.physics.box2d.CircleShape;
 import com.badlogic.gdx.physics.box2d.EdgeShape;
@@ -16,8 +15,6 @@ import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.Shape;
 import com.badlogic.gdx.physics.box2d.Shape.Type;
-import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.IntArray;
 
 /**
  * Light shaped as a circle with given radius
@@ -88,20 +85,11 @@ public class PointLight extends PositionalLight {
 		}
 	}
 	
-	final Vector2 center = new Vector2(); 
-	final IntArray ind = new IntArray();
-	final LightData tmpData = new LightData(0f);
-	final Array<Vector2> tmpVerts = new Array<Vector2>();
-	
 	protected void updateDynamicShadowMeshes() {
 		for (Mesh mesh : dynamicShadowMeshes) {
 			mesh.dispose();
 		}
 		dynamicShadowMeshes.clear();
-		
-		if (dynamicSegments == null) {
-			dynamicSegments = new float[vertexNum * 16];
-		}
 		
 		float colBits = rayHandler.ambientLight.toFloatBits();
 		for (Fixture fixture : affectedFixtures) {
@@ -186,15 +174,15 @@ public class PointLight extends PositionalLight {
 					
 					tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
 					
-					dynamicSegments[size++] = tmpVec.x;
-					dynamicSegments[size++] = tmpVec.y;
-					dynamicSegments[size++] = colBits;
-					dynamicSegments[size++] = f;
+					segments[size++] = tmpVec.x;
+					segments[size++] = tmpVec.y;
+					segments[size++] = colBits;
+					segments[size++] = f;
 					
-					dynamicSegments[size++] = tmpEnd.x;
-					dynamicSegments[size++] = tmpEnd.y;
-					dynamicSegments[size++] = colBits;
-					dynamicSegments[size++] = f;
+					segments[size++] = tmpEnd.x;
+					segments[size++] = tmpEnd.y;
+					segments[size++] = colBits;
+					segments[size++] = f;
 				}
 			} else if (type == Type.Circle) {
 				CircleShape shape = (CircleShape)fixtureShape;
@@ -210,16 +198,16 @@ public class PointLight extends PositionalLight {
 						RayHandler.CIRCLE_APPROX_POINTS;
 				for (int k = 0; k < RayHandler.CIRCLE_APPROX_POINTS; k++) {
 					tmpStart.set(center).add(tmpVec);
-					dynamicSegments[size++] = tmpStart.x;
-					dynamicSegments[size++] = tmpStart.y;
-					dynamicSegments[size++] = colBits;
-					dynamicSegments[size++] = f;
+					segments[size++] = tmpStart.x;
+					segments[size++] = tmpStart.y;
+					segments[size++] = colBits;
+					segments[size++] = f;
 					
 					tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
-					dynamicSegments[size++] = tmpEnd.x;
-					dynamicSegments[size++] = tmpEnd.y;
-					dynamicSegments[size++] = colBits;
-					dynamicSegments[size++] = f;
+					segments[size++] = tmpEnd.x;
+					segments[size++] = tmpEnd.y;
+					segments[size++] = colBits;
+					segments[size++] = f;
 					
 					tmpVec.rotateRad(angle);
 				}
@@ -231,32 +219,32 @@ public class PointLight extends PositionalLight {
 				float dst = tmpVec.dst(start);
 				l = data.getLimit(dst, height, distance);
 				
-				dynamicSegments[size++] = tmpVec.x;
-				dynamicSegments[size++] = tmpVec.y;
-				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = f;
+				segments[size++] = tmpVec.x;
+				segments[size++] = tmpVec.y;
+				segments[size++] = colBits;
+				segments[size++] = f;
 				
 				tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
-				dynamicSegments[size++] = tmpEnd.x;
-				dynamicSegments[size++] = tmpEnd.y;
-				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = f;
+				segments[size++] = tmpEnd.x;
+				segments[size++] = tmpEnd.y;
+				segments[size++] = colBits;
+				segments[size++] = f;
 				
 				shape.getVertex2(tmpVec);
 				tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
 				dst = tmpVec.dst(start);
 				l = data.getLimit(dst, height, distance);
 				
-				dynamicSegments[size++] = tmpVec.x;
-				dynamicSegments[size++] = tmpVec.y;
-				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = f;
+				segments[size++] = tmpVec.x;
+				segments[size++] = tmpVec.y;
+				segments[size++] = colBits;
+				segments[size++] = f;
 				
 				tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
-				dynamicSegments[size++] = tmpEnd.x;
-				dynamicSegments[size++] = tmpEnd.y;
-				dynamicSegments[size++] = colBits;
-				dynamicSegments[size++] = f;
+				segments[size++] = tmpEnd.x;
+				segments[size++] = tmpEnd.y;
+				segments[size++] = colBits;
+				segments[size++] = f;
 			}		
 			
 			Mesh mesh = new Mesh(
@@ -264,7 +252,7 @@ public class PointLight extends PositionalLight {
 					new VertexAttribute(Usage.Position, 2, "vertex_positions"),
 					new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
 					new VertexAttribute(Usage.Generic, 1, "s"));
-			mesh.setVertices(dynamicSegments, 0, size);
+			mesh.setVertices(segments, 0, size);
 			dynamicShadowMeshes.add(mesh);
 		}
 	}
@@ -280,10 +268,6 @@ public class PointLight extends PositionalLight {
 		dist *= RayHandler.gammaCorrectionParameter;
 		this.distance = dist < 0.01f ? 0.01f : dist;
 		dirty = true;
-	}
-	
-	public void setHeight(float height) {
-		this.height = height;
 	}
 	
 	/** Updates light basing on it's distance and rayNum **/

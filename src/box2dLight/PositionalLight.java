@@ -12,7 +12,6 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.QueryCallback;
-import com.badlogic.gdx.utils.Array;
 
 /**
  * Abstract base class for all positional lights
@@ -22,9 +21,6 @@ import com.badlogic.gdx.utils.Array;
  * @author kalle_h
  */
 public abstract class PositionalLight extends Light {
-
-	protected final Vector2 tmpStart = new Vector2();
-	protected final Vector2 tmpEnd = new Vector2();
 	protected final Vector2 start = new Vector2();
 	
 	protected Body body;
@@ -37,12 +33,6 @@ public abstract class PositionalLight extends Light {
 
 	protected float endX[];
 	protected float endY[];
-	
-	protected float[] dynamicSegments;
-	final Vector2 tmpVec = new Vector2();
-	final Array<Fixture> affectedFixtures = new Array<Fixture>();
-	
-	protected float height = 0f;
 	
 	/** 
 	 * Creates new positional light and automatically adds it to the specified
@@ -219,10 +209,6 @@ public abstract class PositionalLight extends Light {
 		cos = new float[rays];
 		endX = new float[rays];
 		endY = new float[rays];
-		
-		if (rayHandler.pseudo3d) {
-			dynamicSegments = new float[vertexNum * 16];
-		}
 	}
 	
 	protected boolean cull() {
@@ -308,6 +294,7 @@ public abstract class PositionalLight extends Light {
 		}
 		softShadowMesh.setVertices(segments, 0, size);
 	}
+	
 	
 	final QueryCallback dynamicShadowCallback = new QueryCallback() {
 
