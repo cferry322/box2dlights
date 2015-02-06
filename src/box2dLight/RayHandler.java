@@ -11,8 +11,6 @@ import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Matrix4;
-import com.badlogic.gdx.physics.box2d.Body;
-import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
@@ -79,8 +77,6 @@ public class RayHandler implements Disposable {
 	 * <p>NOTE: DO NOT MODIFY THIS LIST
 	 */
 	final Array<Light> disabledLights = new Array<Light>(false, 16);
-	
-	final Array<Body> bodies = new Array<Body>();
 
 	final LightMap lightMap;
 	final ShaderProgram lightShader;
@@ -283,16 +279,6 @@ public class RayHandler implements Disposable {
 	 * @see #render()
 	 */
 	public void update() {
-		world.getBodies(bodies);
-		for (Body body : bodies) {
-			for (Fixture fixture : body.getFixtureList()) {
-				if (fixture.getUserData() instanceof LightData) {
-					LightData data = (LightData)fixture.getUserData();
-					data.shadowsDropped = 0;
-				}
-			}
-		}
-		
 		for (Light light : lightList) {
 			light.update();
 		}

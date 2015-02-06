@@ -314,6 +314,10 @@ public abstract class PositionalLight extends Light {
 		@Override
 		public boolean reportFixture(Fixture fixture) {
 			if (fixture.getBody() != body) {
+				if (fixture.getUserData() instanceof LightData) {
+					LightData data = (LightData)fixture.getUserData();
+					data.shadowsDropped = 0;
+				}
 				affectedFixtures.add(fixture);
 			}
 			return true;
