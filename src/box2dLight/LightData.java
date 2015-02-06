@@ -1,5 +1,7 @@
 package box2dLight;
 
+import com.badlogic.gdx.physics.box2d.Fixture;
+
 public class LightData {
 	
 	public Object userData = null;
@@ -30,6 +32,15 @@ public class LightData {
 		}
 		if (l < 0) l = 0f;
 		return l;
+	}
+	
+	public static Object getUserData(Fixture fixture) {
+		Object data = fixture.getUserData();
+		if (data instanceof LightData) {
+			return ((LightData)data).userData;
+		} else {
+			return data;
+		}
 	}
 	
 }
