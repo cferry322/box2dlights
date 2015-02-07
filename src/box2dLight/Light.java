@@ -6,6 +6,7 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.Filter;
 import com.badlogic.gdx.physics.box2d.Fixture;
+import com.badlogic.gdx.physics.box2d.QueryCallback;
 import com.badlogic.gdx.physics.box2d.RayCastCallback;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
@@ -477,5 +478,25 @@ public abstract class Light implements Disposable {
 		filterA.groupIndex = groupIndex;
 		filterA.maskBits = maskBits;
 	}
+	
+	protected boolean onDynamicCallback(Fixture fixture) {
+		return true;
+	}
+	
+	final QueryCallback dynamicShadowCallback = new QueryCallback() {
+
+		@Override
+		public boolean reportFixture(Fixture fixture) {
+			if (!onDynamicCallback(fixture)) return true;
+			
+			if (fixture.getUserData() instanceof LightData) {
+				LightData data = (LightData)fixture.getUserData();
+				data.shadowsDropped = 0;
+			}
+			affectedFixtures.add(fixture);
+			return true;
+		}
+		
+	};
 
 }

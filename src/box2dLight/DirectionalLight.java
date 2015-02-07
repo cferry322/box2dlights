@@ -16,7 +16,6 @@ import com.badlogic.gdx.physics.box2d.CircleShape;
 import com.badlogic.gdx.physics.box2d.EdgeShape;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
-import com.badlogic.gdx.physics.box2d.QueryCallback;
 import com.badlogic.gdx.physics.box2d.Shape;
 import com.badlogic.gdx.physics.box2d.Shape.Type;
 
@@ -100,6 +99,7 @@ public class DirectionalLight extends Light {
 			yDisp = -sizeOfScreen * sin;
 			
 			prepeareFixtureData();
+			updateDynamicShadowMeshes();
 		}
 		
 		if (staticLight && !dirty) return;
@@ -193,8 +193,6 @@ public class DirectionalLight extends Light {
 	@Override
 	void dynamicShadowRender () {
 		if (height == -1f) return;
-		
-		updateDynamicShadowMeshes();
 		for (Mesh m : dynamicShadowMeshes) {
 			m.render(rayHandler.lightShader, GL20.GL_TRIANGLE_STRIP);
 		}
@@ -215,11 +213,7 @@ public class DirectionalLight extends Light {
 	}
 	
 	protected void updateDynamicShadowMeshes() {
-		for (Mesh mesh : dynamicShadowMeshes) {
-			mesh.dispose();
-		}
-		dynamicShadowMeshes.clear();
-		
+		int meshInd = 0;
 		float colBits = rayHandler.ambientLight.toFloatBits();
 		for (Fixture fixture : affectedFixtures) {
 			LightData data = (LightData)fixture.getUserData();
@@ -227,12 +221,13 @@ public class DirectionalLight extends Light {
 			
 			Shape fixtureShape = fixture.getShape();
 			Type type = fixtureShape.getType();
-			center.set(fixture.getBody().getWorldCenter());
+			Body body = fixture.getBody();
+			center.set(body.getWorldCenter());
 			lstart.set(center).add(xDisp, yDisp);
 			
 			int size = 0;
 			float l = data.height /
-					(float)Math.tan(height * MathUtils.degRad);
+					(float) Math.tan(height * MathUtils.degRad);
 			float f = 1f / data.shadowsDropped;
 			if (type == Type.Polygon || type == Type.Chain) {
 				boolean isPolygon = (type == Type.Polygon);
@@ -241,8 +236,7 @@ public class DirectionalLight extends Light {
 				PolygonShape pShape = isPolygon ?
 						(PolygonShape)fixtureShape : null;
 				int vertexCount = isPolygon ?
-						pShape.getVertexCount() :
-							cShape.getVertexCount();
+						pShape.getVertexCount() : cShape.getVertexCount();
 				int minN = -1;
 				int maxN = -1;
 				int minDstN = -1;
@@ -255,11 +249,12 @@ public class DirectionalLight extends Light {
 					} else {
 						cShape.getVertex(n, tmpVec);
 					}
-					tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+					tmpVec.set(body.getWorldPoint(tmpVec));
 					tmpVerts.add(tmpVec.cpy());
-					tmpEnd.set(tmpVec).sub(lstart).limit(0.01f).add(tmpVec);
+					
+					tmpEnd.set(tmpVec).sub(lstart).limit2(0.0001f).add(tmpVec);
 					if (fixture.testPoint(tmpEnd)) {
-						if (n > minN) minN = n;
+						if (minN == -1) minN = n;
 						maxN = n;
 						hasGasp = true;
 						continue;
@@ -274,19 +269,21 @@ public class DirectionalLight extends Light {
 				ind.clear();
 				if (!hasGasp) {
 					tmpVec.set(tmpVerts.get(minDstN));
-					boolean correctDirection = Intersector.pointLineSide(
-							lstart, center, tmpVec) < 0;
 					for (int n = minDstN; n < vertexCount; n++) {
 						ind.add(n);
 					}
 					for (int n = 0; n < minDstN; n++) {
 						ind.add(n);
 					}
-					if (!correctDirection) {
+					if (Intersector.pointLineSide(lstart, center, tmpVec) > 0) {
 						int z = ind.get(0);
 						ind.removeIndex(0);
 						ind.reverse();
 						ind.insert(0, z);
+					}
+				} else if (minN == 0 && maxN == vertexCount - 1) {
+					for (int n = maxN - 1; n > minN; n--) {
+						ind.add(n);
 					}
 				} else {
 					for (int n = minN - 1; n > -1; n--) {
@@ -297,8 +294,7 @@ public class DirectionalLight extends Light {
 					}
 				}
 				
-				for (int k = 0; k < ind.size; k++) {
-					int n = ind.get(k);
+				for (int n : ind.toArray()) {
 					tmpVec.set(tmpVerts.get(n));
 					tmpEnd.set(tmpVec).sub(lstart).limit(l).add(tmpVec);
 					
@@ -343,7 +339,7 @@ public class DirectionalLight extends Light {
 				EdgeShape shape = (EdgeShape)fixtureShape;
 				
 				shape.getVertex1(tmpVec);
-				tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+				tmpVec.set(body.getWorldPoint(tmpVec));
 				
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
@@ -357,7 +353,7 @@ public class DirectionalLight extends Light {
 				segments[size++] = f;
 				
 				shape.getVertex2(tmpVec);
-				tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+				tmpVec.set(body.getWorldPoint(tmpVec));
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
 				segments[size++] = zeroColorBits;
@@ -370,14 +366,21 @@ public class DirectionalLight extends Light {
 				segments[size++] = f;
 			}		
 			
-			Mesh mesh = new Mesh(
-					VertexDataType.VertexArray, staticLight, size / 4, 0,
-					new VertexAttribute(Usage.Position, 2, "vertex_positions"),
-					new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
-					new VertexAttribute(Usage.Generic, 1, "s"));
+			Mesh mesh = null;
+			if (meshInd >= dynamicShadowMeshes.size) {
+				mesh = new Mesh(
+						VertexDataType.VertexArray, false, 64, 0,
+						new VertexAttribute(Usage.Position, 2, "vertex_positions"),
+						new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
+						new VertexAttribute(Usage.Generic, 1, "s"));
+				dynamicShadowMeshes.add(mesh);
+			} else {
+				mesh = dynamicShadowMeshes.get(meshInd);
+			}
 			mesh.setVertices(segments, 0, size);
-			dynamicShadowMeshes.add(mesh);
+			meshInd++;
 		}
+		dynamicShadowMeshes.truncate(meshInd);
 	}
 	
 	@Override
@@ -403,20 +406,6 @@ public class DirectionalLight extends Light {
 		return oddNodes;
 	}
 	
-	final QueryCallback dynamicShadowCallback = new QueryCallback() {
-
-		@Override
-		public boolean reportFixture(Fixture fixture) {
-			if (fixture.getUserData() instanceof LightData) {
-				LightData data = (LightData)fixture.getUserData();
-				data.shadowsDropped = 0;
-			}
-			affectedFixtures.add(fixture);
-			return true;
-		}
-		
-	};
-	
 	/** Sets the horizontal angle for directional light in degrees
 	 * 
 	 * <p> This could be used to simulate sun cycles **/
@@ -432,6 +421,7 @@ public class DirectionalLight extends Light {
 			else height = degrees;
 		}
 	}
+
 
 	/** Not applicable for this light type **/
 	@Deprecated

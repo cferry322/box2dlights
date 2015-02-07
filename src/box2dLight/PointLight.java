@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.VertexAttribute;
 import com.badlogic.gdx.graphics.VertexAttributes.Usage;
 import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.ChainShape;
 import com.badlogic.gdx.physics.box2d.CircleShape;
 import com.badlogic.gdx.physics.box2d.EdgeShape;
@@ -74,34 +75,33 @@ public class PointLight extends PositionalLight {
 		
 		if (rayHandler.pseudo3d) {
 			prepeareFixtureData();
+			updateDynamicShadowMeshes();
 		}
 	}
 	
 	@Override
 	void dynamicShadowRender () {
-		updateDynamicShadowMeshes();
 		for (Mesh m : dynamicShadowMeshes) {
 			m.render(rayHandler.lightShader, GL20.GL_TRIANGLE_STRIP);
 		}
 	}
 	
 	protected void updateDynamicShadowMeshes() {
-		for (Mesh mesh : dynamicShadowMeshes) {
-			mesh.dispose();
-		}
-		dynamicShadowMeshes.clear();
-		
+		int meshInd = 0;
 		float colBits = rayHandler.ambientLight.toFloatBits();
 		for (Fixture fixture : affectedFixtures) {
 			LightData data = (LightData)fixture.getUserData();
 			if (data == null || fixture.isSensor()) continue;
 			
-			Shape fixtureShape = fixture.getShape();
-			Type type = fixtureShape.getType();
-			center.set(fixture.getBody().getWorldCenter());
 			int size = 0;
 			float l = 0f;
 			float f = 1f / data.shadowsDropped;
+			
+			Shape fixtureShape = fixture.getShape();
+			Type type = fixtureShape.getType();
+			Body body = fixture.getBody();
+			center.set(body.getWorldCenter());
+			
 			if (type == Type.Polygon || type == Type.Chain) {
 				boolean isPolygon = (type == Type.Polygon);
 				ChainShape cShape = isPolygon ?
@@ -109,8 +109,7 @@ public class PointLight extends PositionalLight {
 				PolygonShape pShape = isPolygon ?
 						(PolygonShape)fixtureShape : null;
 				int vertexCount = isPolygon ?
-						pShape.getVertexCount() :
-							cShape.getVertexCount();
+						pShape.getVertexCount() : cShape.getVertexCount();
 				int minN = -1;
 				int maxN = -1;
 				int minDstN = -1;
@@ -123,15 +122,16 @@ public class PointLight extends PositionalLight {
 					} else {
 						cShape.getVertex(n, tmpVec);
 					}
-					tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+					tmpVec.set(body.getWorldPoint(tmpVec));
 					tmpVerts.add(tmpVec.cpy());
-					tmpEnd.set(tmpVec).sub(start).limit(0.01f).add(tmpVec);
+					tmpEnd.set(tmpVec).sub(start).limit2(0.0001f).add(tmpVec);
 					if (fixture.testPoint(tmpEnd)) {
-						if (n > minN) minN = n;
+						if (minN == -1) minN = n;
 						maxN = n;
 						hasGasp = true;
 						continue;
 					}
+					
 					float currDist = tmpVec.dst2(start);
 					if (currDist < minDst) {
 						minDst = currDist;
@@ -142,19 +142,19 @@ public class PointLight extends PositionalLight {
 				ind.clear();
 				if (!hasGasp) {
 					tmpVec.set(tmpVerts.get(minDstN));
-					boolean correctDirection = Intersector.pointLineSide(
-							start, center, tmpVec) < 0;
 					for (int n = minDstN; n < vertexCount; n++) {
 						ind.add(n);
 					}
 					for (int n = 0; n < minDstN; n++) {
 						ind.add(n);
 					}
-					if (!correctDirection) {
-						int z = ind.get(0);
-						ind.removeIndex(0);
+					if (Intersector.pointLineSide(start, center, tmpVec) > 0) {
 						ind.reverse();
-						ind.insert(0, z);
+						ind.insert(0, ind.pop());
+					}
+				} else if (minN == 0 && maxN == vertexCount - 1) {
+					for (int n = maxN - 1; n > minN; n--) {
+						ind.add(n);
 					}
 				} else {
 					for (int n = minN - 1; n > -1; n--) {
@@ -165,8 +165,7 @@ public class PointLight extends PositionalLight {
 					}
 				}
 				
-				for (int k = 0; k < ind.size; k++) {
-					int n = ind.get(k);
+				for (int n : ind.toArray()) {
 					tmpVec.set(tmpVerts.get(n));
 					
 					float dst = tmpVec.dst(start);
@@ -215,7 +214,7 @@ public class PointLight extends PositionalLight {
 				EdgeShape shape = (EdgeShape)fixtureShape;
 				
 				shape.getVertex1(tmpVec);
-				tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+				tmpVec.set(body.getWorldPoint(tmpVec));
 				float dst = tmpVec.dst(start);
 				l = data.getLimit(dst, height, distance);
 				
@@ -231,7 +230,7 @@ public class PointLight extends PositionalLight {
 				segments[size++] = f;
 				
 				shape.getVertex2(tmpVec);
-				tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
+				tmpVec.set(body.getWorldPoint(tmpVec));
 				dst = tmpVec.dst(start);
 				l = data.getLimit(dst, height, distance);
 				
@@ -245,16 +244,23 @@ public class PointLight extends PositionalLight {
 				segments[size++] = tmpEnd.y;
 				segments[size++] = colBits;
 				segments[size++] = f;
-			}		
+			}
 			
-			Mesh mesh = new Mesh(
-					VertexDataType.VertexArray, staticLight, size / 4, 0,
-					new VertexAttribute(Usage.Position, 2, "vertex_positions"),
-					new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
-					new VertexAttribute(Usage.Generic, 1, "s"));
+			Mesh mesh = null;
+			if (meshInd >= dynamicShadowMeshes.size) {
+				mesh = new Mesh(
+						VertexDataType.VertexArray, false, 64, 0,
+						new VertexAttribute(Usage.Position, 2, "vertex_positions"),
+						new VertexAttribute(Usage.ColorPacked, 4, "quad_colors"),
+						new VertexAttribute(Usage.Generic, 1, "s"));
+				dynamicShadowMeshes.add(mesh);
+			} else {
+				mesh = dynamicShadowMeshes.get(meshInd);
+			}
 			mesh.setVertices(segments, 0, size);
-			dynamicShadowMeshes.add(mesh);
+			meshInd++;
 		}
+		dynamicShadowMeshes.truncate(meshInd);
 	}
 	
 	/**

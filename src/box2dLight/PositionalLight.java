@@ -11,7 +11,6 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.Fixture;
-import com.badlogic.gdx.physics.box2d.QueryCallback;
 
 /**
  * Abstract base class for all positional lights
@@ -239,7 +238,7 @@ public abstract class PositionalLight extends Light {
 			mx[i] = tmpEnd.x;
 			tmpEnd.y = endY[i] + start.y;
 			my[i] = tmpEnd.y;
-			if (rayHandler.world != null && !xray && !rayHandler.pseudo3d) {
+			if (!rayHandler.pseudo3d && rayHandler.world != null && !xray) {
 				rayHandler.world.rayCast(ray, start, tmpEnd);
 			}
 		}
@@ -295,21 +294,9 @@ public abstract class PositionalLight extends Light {
 		softShadowMesh.setVertices(segments, 0, size);
 	}
 	
-	
-	final QueryCallback dynamicShadowCallback = new QueryCallback() {
-
-		@Override
-		public boolean reportFixture(Fixture fixture) {
-			if (fixture.getBody() != body) {
-				if (fixture.getUserData() instanceof LightData) {
-					LightData data = (LightData)fixture.getUserData();
-					data.shadowsDropped = 0;
-				}
-				affectedFixtures.add(fixture);
-			}
-			return true;
-		}
-		
-	};
+	@Override
+	protected boolean onDynamicCallback(Fixture fixture) {
+		return fixture.getBody() != body;
+	}
 	
 }
