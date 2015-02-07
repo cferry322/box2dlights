@@ -304,7 +304,7 @@ public class DirectionalLight extends Light {
 					
 					segments[size++] = tmpVec.x;
 					segments[size++] = tmpVec.y;
-					segments[size++] = colBits;
+					segments[size++] = zeroColorBits;
 					segments[size++] = f;
 					
 					segments[size++] = tmpEnd.x;
@@ -328,7 +328,7 @@ public class DirectionalLight extends Light {
 					tmpStart.set(center).add(tmpVec);
 					segments[size++] = tmpStart.x;
 					segments[size++] = tmpStart.y;
-					segments[size++] = colBits;
+					segments[size++] = zeroColorBits;
 					segments[size++] = f;
 					
 					tmpEnd.set(tmpStart).sub(lstart).limit(l).add(tmpStart);
@@ -347,7 +347,7 @@ public class DirectionalLight extends Light {
 				
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
-				segments[size++] = colBits;
+				segments[size++] = zeroColorBits;
 				segments[size++] = f;
 				
 				tmpEnd.set(tmpVec).sub(lstart).limit(l).add(tmpVec);
@@ -360,8 +360,8 @@ public class DirectionalLight extends Light {
 				tmpVec.set(fixture.getBody().getWorldPoint(tmpVec));
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
-				segments[size++] = colBits;
-				segments[size++] = 1f;
+				segments[size++] = zeroColorBits;
+				segments[size++] = f;
 				
 				tmpEnd.set(tmpVec).sub(lstart).limit(l).add(tmpVec);
 				segments[size++] = tmpEnd.x;
@@ -428,7 +428,8 @@ public class DirectionalLight extends Light {
 			if (degrees > 180f) {
 				height = -1f;
 			}
-			else if (degrees != 90f) height = Math.abs(degrees - 90f);
+			else if (degrees > 90f) height = degrees - 90f;
+			else height = degrees;
 		}
 	}
 

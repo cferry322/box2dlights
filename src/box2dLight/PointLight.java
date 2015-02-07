@@ -176,7 +176,7 @@ public class PointLight extends PositionalLight {
 					
 					segments[size++] = tmpVec.x;
 					segments[size++] = tmpVec.y;
-					segments[size++] = colBits;
+					segments[size++] = zeroColorBits;
 					segments[size++] = f;
 					
 					segments[size++] = tmpEnd.x;
@@ -200,7 +200,7 @@ public class PointLight extends PositionalLight {
 					tmpStart.set(center).add(tmpVec);
 					segments[size++] = tmpStart.x;
 					segments[size++] = tmpStart.y;
-					segments[size++] = colBits;
+					segments[size++] = zeroColorBits;
 					segments[size++] = f;
 					
 					tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
@@ -221,7 +221,7 @@ public class PointLight extends PositionalLight {
 				
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
-				segments[size++] = colBits;
+				segments[size++] = zeroColorBits;
 				segments[size++] = f;
 				
 				tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
@@ -237,7 +237,7 @@ public class PointLight extends PositionalLight {
 				
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
-				segments[size++] = colBits;
+				segments[size++] = zeroColorBits;
 				segments[size++] = f;
 				
 				tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
