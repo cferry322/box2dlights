@@ -87,6 +87,7 @@ public class RayHandler implements Disposable {
 	
 	/** Experimental mode **/
 	boolean pseudo3d = false;
+	boolean shadowColorInterpolation = false;
 
 	int blurNum = 1;
 	
@@ -559,6 +560,16 @@ public class RayHandler implements Disposable {
 	 */
 	public void setPseudo3dLight(boolean flag) {
 		pseudo3d = flag;
+	}
+	
+	/** 
+	 * /!\ Experimental mode with dynamic shadowing in pseudo-3d world
+	 * 
+	 * @param flag
+	 */
+	public void setPseudo3dLight(boolean flag, boolean interpolateShadows) {
+		pseudo3d = flag;
+		shadowColorInterpolation = interpolateShadows;
 	}
 
 	/**

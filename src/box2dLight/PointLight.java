@@ -88,6 +88,7 @@ public class PointLight extends PositionalLight {
 	
 	protected void updateDynamicShadowMeshes() {
 		int meshInd = 0;
+		
 		float colBits = rayHandler.ambientLight.toFloatBits();
 		for (Fixture fixture : affectedFixtures) {
 			LightData data = (LightData)fixture.getUserData();
@@ -96,6 +97,13 @@ public class PointLight extends PositionalLight {
 			int size = 0;
 			float l = 0f;
 			float f = 1f / data.shadowsDropped;
+			
+			float startColBits = rayHandler.shadowColorInterpolation ?
+					Color.BLACK.lerp(rayHandler.ambientLight, 1-f).toFloatBits() :
+					zeroColorBits;
+			float endColBits = rayHandler.shadowColorInterpolation ?
+					Color.WHITE.lerp(rayHandler.ambientLight, 1-f).toFloatBits() :
+					colBits;
 			
 			Shape fixtureShape = fixture.getShape();
 			Type type = fixtureShape.getType();
@@ -170,17 +178,16 @@ public class PointLight extends PositionalLight {
 					
 					float dst = tmpVec.dst(start);
 					l = data.getLimit(dst, height, distance);
-					
-					tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
+					tmpEnd.set(tmpVec).sub(start).setLength(l).add(tmpVec);
 					
 					segments[size++] = tmpVec.x;
 					segments[size++] = tmpVec.y;
-					segments[size++] = zeroColorBits;
+					segments[size++] = startColBits;
 					segments[size++] = f;
 					
 					segments[size++] = tmpEnd.x;
 					segments[size++] = tmpEnd.y;
-					segments[size++] = colBits;
+					segments[size++] = endColBits;
 					segments[size++] = f;
 				}
 			} else if (type == Type.Circle) {
@@ -199,13 +206,13 @@ public class PointLight extends PositionalLight {
 					tmpStart.set(center).add(tmpVec);
 					segments[size++] = tmpStart.x;
 					segments[size++] = tmpStart.y;
-					segments[size++] = zeroColorBits;
+					segments[size++] = startColBits;
 					segments[size++] = f;
 					
-					tmpEnd.set(tmpStart).sub(start).limit(l).add(tmpStart);
+					tmpEnd.set(tmpStart).sub(start).setLength(l).add(tmpStart);
 					segments[size++] = tmpEnd.x;
 					segments[size++] = tmpEnd.y;
-					segments[size++] = colBits;
+					segments[size++] = endColBits;
 					segments[size++] = f;
 					
 					tmpVec.rotateRad(angle);
@@ -220,13 +227,13 @@ public class PointLight extends PositionalLight {
 				
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
-				segments[size++] = zeroColorBits;
+				segments[size++] = startColBits;
 				segments[size++] = f;
 				
-				tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
+				tmpEnd.set(tmpVec).sub(start).setLength(l).add(tmpVec);
 				segments[size++] = tmpEnd.x;
 				segments[size++] = tmpEnd.y;
-				segments[size++] = colBits;
+				segments[size++] = endColBits;
 				segments[size++] = f;
 				
 				shape.getVertex2(tmpVec);
@@ -236,13 +243,13 @@ public class PointLight extends PositionalLight {
 				
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
-				segments[size++] = zeroColorBits;
+				segments[size++] = startColBits;
 				segments[size++] = f;
 				
-				tmpEnd.set(tmpVec).sub(start).limit(l).add(tmpVec);
+				tmpEnd.set(tmpVec).sub(start).setLength(l).add(tmpVec);
 				segments[size++] = tmpEnd.x;
 				segments[size++] = tmpEnd.y;
-				segments[size++] = colBits;
+				segments[size++] = endColBits;
 				segments[size++] = f;
 			}
 			

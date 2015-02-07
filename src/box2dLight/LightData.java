@@ -22,7 +22,7 @@ public class LightData {
 	public float getLimit(float distance, float lightHeight, float lightRange) {
 		float l = 0f;
 		if (lightHeight > height) {
-			l = lightRange * height / (lightHeight - height);
+			l = distance * height / (lightHeight - height);
 			float diff = lightRange - distance;
 			if (l > diff) l = diff;
 		} else if (lightHeight == 0f) {
@@ -30,8 +30,8 @@ public class LightData {
 		} else {
 			l = lightRange - distance;
 		}
-		if (l < 0) l = 0f;
-		return l;
+		
+		return l > 0 ? l : 0f;
 	}
 	
 	public static Object getUserData(Fixture fixture) {

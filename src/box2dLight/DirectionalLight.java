@@ -229,6 +229,14 @@ public class DirectionalLight extends Light {
 			float l = data.height /
 					(float) Math.tan(height * MathUtils.degRad);
 			float f = 1f / data.shadowsDropped;
+			
+			float startColBits = rayHandler.shadowColorInterpolation ?
+					Color.BLACK.lerp(rayHandler.ambientLight, 1-f).toFloatBits() :
+					zeroColorBits;
+			float endColBits = rayHandler.shadowColorInterpolation ?
+					Color.WHITE.lerp(rayHandler.ambientLight, 1-f).toFloatBits() :
+					colBits;
+			
 			if (type == Type.Polygon || type == Type.Chain) {
 				boolean isPolygon = (type == Type.Polygon);
 				ChainShape cShape = isPolygon ?
@@ -296,16 +304,16 @@ public class DirectionalLight extends Light {
 				
 				for (int n : ind.toArray()) {
 					tmpVec.set(tmpVerts.get(n));
-					tmpEnd.set(tmpVec).sub(lstart).limit(l).add(tmpVec);
+					tmpEnd.set(tmpVec).sub(lstart).setLength(l).add(tmpVec);
 					
 					segments[size++] = tmpVec.x;
 					segments[size++] = tmpVec.y;
-					segments[size++] = zeroColorBits;
+					segments[size++] = startColBits;
 					segments[size++] = f;
 					
 					segments[size++] = tmpEnd.x;
 					segments[size++] = tmpEnd.y;
-					segments[size++] = colBits;
+					segments[size++] = endColBits;
 					segments[size++] = f;
 				}
 			} else if (type == Type.Circle) {
@@ -324,13 +332,13 @@ public class DirectionalLight extends Light {
 					tmpStart.set(center).add(tmpVec);
 					segments[size++] = tmpStart.x;
 					segments[size++] = tmpStart.y;
-					segments[size++] = zeroColorBits;
+					segments[size++] = startColBits;
 					segments[size++] = f;
 					
-					tmpEnd.set(tmpStart).sub(lstart).limit(l).add(tmpStart);
+					tmpEnd.set(tmpStart).sub(lstart).setLength(l).add(tmpStart);
 					segments[size++] = tmpEnd.x;
 					segments[size++] = tmpEnd.y;
-					segments[size++] = colBits;
+					segments[size++] = endColBits;
 					segments[size++] = f;
 					
 					tmpVec.rotateRad(angle);
@@ -343,26 +351,26 @@ public class DirectionalLight extends Light {
 				
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
-				segments[size++] = zeroColorBits;
+				segments[size++] = startColBits;
 				segments[size++] = f;
 				
-				tmpEnd.set(tmpVec).sub(lstart).limit(l).add(tmpVec);
+				tmpEnd.set(tmpVec).sub(lstart).setLength(l).add(tmpVec);
 				segments[size++] = tmpEnd.x;
 				segments[size++] = tmpEnd.y;
-				segments[size++] = colBits;
+				segments[size++] = endColBits;
 				segments[size++] = f;
 				
 				shape.getVertex2(tmpVec);
 				tmpVec.set(body.getWorldPoint(tmpVec));
 				segments[size++] = tmpVec.x;
 				segments[size++] = tmpVec.y;
-				segments[size++] = zeroColorBits;
+				segments[size++] = startColBits;
 				segments[size++] = f;
 				
-				tmpEnd.set(tmpVec).sub(lstart).limit(l).add(tmpVec);
+				tmpEnd.set(tmpVec).sub(lstart).setLength(l).add(tmpVec);
 				segments[size++] = tmpEnd.x;
 				segments[size++] = tmpEnd.y;
-				segments[size++] = colBits;
+				segments[size++] = endColBits;
 				segments[size++] = f;
 			}		
 			
